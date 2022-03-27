@@ -1,0 +1,4 @@
+.vscode/
+examples/*
+!examples/example.go
+!examples/example.sh
