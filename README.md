@@ -1,6 +1,6 @@
 # Executive
 
-[`os.exec`](), but a little fancier! A simple wrapper providing extra functionality and cleaner usage when using it heavily.
+[`os.exec`](https://pkg.go.dev/os/exec), but a little fancier! A simple wrapper providing extra functionality and cleaner usage when using it heavily.
 
 > I have made this with a specific use case in mind, so the functionality added is of course biased towards that...
 
@@ -9,6 +9,8 @@
 ### Script
 
 A script is considered to be a normal script file, however, it may also contain handlebar values that can be populated in the program. For example, a script compatible with this package is:
+
+> 💡 As the content of the script is written to and executed from a file, the shebang is needed on the first line...
 
 _`example.sh`_
 ```bash
@@ -27,7 +29,7 @@ echo "IMDB Score: "$IMDB
 
 > ⚠️ Handlebar values that are not given a value by the program will simply be omitted from the script
 
-For more on how to use golang templates, see [here]().
+For more on how to use golang templates, see [here](https://pkg.go.dev/text/template).
 
 ### Executable
 
