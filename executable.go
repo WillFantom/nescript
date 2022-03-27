@@ -58,6 +58,28 @@ func NewExecutable(originScript *Script, compiled string) (*Executable, error) {
 	return &executable, nil
 }
 
+//NewExecutableFromFile is similar to creating a script from file, however this
+//assumes the script is already "compiled" and so does not need to be parsed by
+//the template system.
+func NewExecutableFromFile(path string) (*Executable, error) {
+	script, err := NewScriptFromFile("", path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create supporting script: %w", err)
+	}
+	return NewExecutable(script, script.Raw)
+}
+
+//NewExecutableFromHTTP is similar to creating a script from a http endpoint, however this
+//assumes the script is already "compiled" and so does not need to be parsed by
+//the template system.
+func NewExecutableFromHTTP(link string) (*Executable, error) {
+	script, err := NewScriptFromHTTP("", link)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create supporting script: %w", err)
+	}
+	return NewExecutable(script, script.Raw)
+}
+
 //WithEnv sets an environment variable that should be set within the script's
 //runtime env. Executable is returned and not directly modified as to support
 //function chains.
