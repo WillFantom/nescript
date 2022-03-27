@@ -1,6 +1,6 @@
 # Executive
 
-![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/willfantom/executive?label=Latest%20Version&sort=semver&style=flat-square)
+[![Go Reference](https://pkg.go.dev/badge/github.com/willfantom/executive.svg)](https://pkg.go.dev/github.com/willfantom/executive) ![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/willfantom/executive?label=Latest%20Version&sort=semver&style=flat-square) 
 
 [`os.exec`](https://pkg.go.dev/os/exec), but a little fancier! A simple wrapper providing extra functionality and cleaner usage when using it heavily.
 
