@@ -1,5 +1,7 @@
 # Executive
 
+![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/willfantom/executive?label=Latest%20Version&sort=semver&style=flat-square)
+
 [`os.exec`](https://pkg.go.dev/os/exec), but a little fancier! A simple wrapper providing extra functionality and cleaner usage when using it heavily.
 
 > I have made this with a specific use case in mind, so the functionality added is of course biased towards that...
