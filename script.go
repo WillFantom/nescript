@@ -50,7 +50,7 @@ func NewScriptFromHTTP(name, link string) (*Script, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not parse given link as a url: %w", err)
 	}
-	if response, err := http.Get(scriptURL.Path); err != nil {
+	if response, err := http.Get(scriptURL.String()); err != nil {
 		return nil, fmt.Errorf("could not get script from url: %w", err)
 	} else {
 		defer response.Body.Close()
