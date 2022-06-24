@@ -43,9 +43,7 @@ A process here is considered an executed/executing instance of the executable. T
 
 ### Result
 
-A result just contains the core output values of the process (stdout, stderr, exit code) and the execution time of the process.
-
-TODO: Support evaluation of the output
+A result just contains the core output values of the process (stdout, stderr, exit code) and the execution time of the process. After a script has completed execution, the std out is evaulated line-by-line. If a line starts with the prefix `::set-json::` and the remainder of the line is valid JSON, the parsed json is stored in the result. This can be used by expressions to evaluate the result (to a boolean).
 
 ---
 
