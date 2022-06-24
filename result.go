@@ -12,10 +12,10 @@ import (
 //exited. The time metrics included are from the process and do not incorporate
 //the time used by executive.
 type Result struct {
-	StdOut   string `json:"stdout"`
-	StdErr   string `json:"stderr"`
-	JSON     any    `json:"json"`
-	ExitCode int    `json:"exitCode"`
+	StdOut   string         `json:"stdout"`
+	StdErr   string         `json:"stderr"`
+	Outputs  map[string]any `json:"outputs"`
+	ExitCode int            `json:"exitCode"`
 
 	TotalTime  time.Duration `json:"executionTime"`
 	SystemTime time.Duration
@@ -23,11 +23,11 @@ type Result struct {
 }
 
 func (r Result) Evaluate(expression string) (bool, error) {
-	program, err := expr.Compile(expression, expr.AsBool())
+	program, err := expr.Compile(expression, expr.Env(r.Outputs), expr.AsBool())
 	if err != nil {
 		return false, fmt.Errorf("expression compilation failed: %w", err)
 	}
-	output, err := expr.Run(program, r.JSON)
+	output, err := expr.Run(program, r.Outputs)
 	if err != nil {
 		return false, fmt.Errorf("expression evaluation failed: %w", err)
 	}

@@ -8,7 +8,7 @@
 
 ---
 
-### Script
+## Script
 
 A script is considered to be a normal script file, however, it may also contain handlebar values that can be populated in the program. For example, a script compatible with this package is:
 
@@ -33,17 +33,34 @@ echo "IMDB Score: "$IMDB
 
 For more on how to use golang templates, see [here](https://pkg.go.dev/text/template).
 
-### Executable
+## Executable
 
 An executable is simply a "compiled" version of the script (where compiled here is just saying it has been though the template system). It is worth nothing that the script is written to a temporary file, and to keep things neat, should be removed when the script is done with.
 
-### Process
+## Process
 
 A process here is considered an executed/executing instance of the executable. This can be killed, strings can be written to the stdin, or `Result` can be called to wait for the script to exit and get the result.
 
-### Result
+## Result
 
-A result just contains the core output values of the process (stdout, stderr, exit code) and the execution time of the process. After a script has completed execution, the std out is evaulated line-by-line. If a line starts with the prefix `::set-json::` and the remainder of the line is valid JSON, the parsed json is stored in the result. This can be used by expressions to evaluate the result (to a boolean).
+A result just contains the core output values of the process (stdout, stderr, exit code) and the execution time of the process. After a script has completed execution, the std out is evaulated line-by-line. If a line starts with the prefix `::set-output name=<> (type=<>)::`, the remainer of the line is considered the value and stored in the result outputs.
+
+### Evaulation
+
+Any script can store outputs, allowing the reults of the script to be automatically parsed. To store an output, a script must print a line to StdOut starting with `::set-output name=example::`, where `example` can be replaced with any name for the specific output. The remainer of the line is then considered the output's value. 
+- If the output should be interpreted as another type than string, this should be specified, for example:
+  `::set-output name=example type=int::42`. 
+
+- For more complex outputs, JSON can be specified, for example: 
+  `::set-output name=example type=json::{"hello": "world:, "number": 42}`
+
+To evaluate these on a scripts result, expressions can be given (using [expr](https://github.com/antonmedv/expr)). 
+- For example an output of type `int` with the name `example` can be evaluated like so:
+  `example > 41` 
+- JSON evaluation works too, using the above JSON example, the following expressions would work: 
+  `example.number > 41`.
+
+
 
 ---
 

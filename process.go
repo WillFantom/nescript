@@ -7,12 +7,18 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
 )
 
 const (
-	jsonOutputPrefix string = "::set-json::"
+	setOutputPattern string = `::set-output name=([^\s][^::][a-zA-Z_-]+)(?:\stype=([a-zA-Z]+))?::(.*)`
+)
+
+var (
+	setOutputRegex *regexp.Regexp
 )
 
 //Process represents a single instance of the script.
@@ -70,8 +76,7 @@ func (p *Process) Result() (*Result, error) {
 		StdOut: string(p.stdoutBytes.String()),
 		StdErr: string(p.stderrBytes.String()),
 	}
-	rawJSON := json.RawMessage(extractJSONSubString(result.StdOut))
-	json.Unmarshal(rawJSON, &result.JSON)
+	result.Outputs = extractOutputs(result.StdOut)
 	result.ExitCode = p.cmd.ProcessState.ExitCode()
 	result.SystemTime = p.cmd.ProcessState.SystemTime()
 	result.UserTime = p.cmd.ProcessState.UserTime()
@@ -82,12 +87,34 @@ func (p *Process) Result() (*Result, error) {
 	return &result, nil
 }
 
-func extractJSONSubString(fullString string) string {
+func extractOutputs(fullString string) map[string]any {
+	outputs := make(map[string]any)
 	lines := strings.Split(fullString, "\n")
 	for _, l := range lines {
-		if strings.HasPrefix(l, jsonOutputPrefix) {
-			return strings.TrimPrefix(l, jsonOutputPrefix)
+		matches := setOutputRegex.FindAllStringSubmatch(l, -1)
+		if len(matches) > 0 {
+			match := matches[0]
+			name := match[1]
+			t := match[2]
+			value := match[3]
+			switch strings.ToLower(t) {
+			case "json", "j":
+				rawJSON := json.RawMessage(value)
+				var jsonValue any
+				json.Unmarshal(rawJSON, &jsonValue)
+				outputs[name] = jsonValue
+			case "int", "i":
+				if v, err := strconv.Atoi(value); err == nil {
+					outputs[name] = v
+				}
+			default:
+				outputs[name] = value
+			}
 		}
 	}
-	return "{}"
+	return outputs
+}
+
+func init() {
+	setOutputRegex = regexp.MustCompile(setOutputPattern)
 }
