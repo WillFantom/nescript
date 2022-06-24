@@ -201,16 +201,8 @@ func (e Executable) Execute() (*Process, error) {
 	if e.workDir != "" {
 		process.cmd.Dir = e.workDir
 	}
-	if stdout, err := process.cmd.StdoutPipe(); err != nil {
-		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
-	} else {
-		process.stdout = stdout
-	}
-	if stderr, err := process.cmd.StderrPipe(); err != nil {
-		return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
-	} else {
-		process.stderr = stderr
-	}
+	process.cmd.Stdout = &process.stdoutBytes
+	process.cmd.Stderr = &process.stderrBytes
 	if stdin, err := process.cmd.StdinPipe(); err != nil {
 		return nil, fmt.Errorf("failed to create stdin pipe: %w", err)
 	} else {

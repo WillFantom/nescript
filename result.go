@@ -9,6 +9,7 @@ import "time"
 type Result struct {
 	StdOut   string `json:"stdout"`
 	StdErr   string `json:"stderr"`
+	JSON     any    `json:"json"`
 	ExitCode int    `json:"exitCode"`
 
 	TotalTime  time.Duration `json:"executionTime"`
