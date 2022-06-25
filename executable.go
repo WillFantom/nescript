@@ -1,19 +1,27 @@
 package executive
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
+
+	"github.com/docker/docker/api/types"
+	docker "github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
+	"golang.org/x/crypto/ssh"
 )
 
-//Executable is a "compiled" script that can be executed. Unlike a Script, an
-//executable has already been "compiled" (parsed through the golang templating
-//engine).
+// Executable is a "compiled" script that can be executed. Unlike a Script, an
+// executable has already been "compiled" (parsed through the golang templating
+// engine).
 type Executable struct {
-	OriginScript Script `json:"origin"`
-	scriptPath   string
+	OriginScript   Script `json:"origin"`
+	compiledScript string
+	scriptPath     string
 
 	env       []string
 	args      []string
@@ -22,9 +30,9 @@ type Executable struct {
 }
 
 var (
-	//tempFilePatternRegExpString matches a string that is alphanumeric (with
-	//hypens or underscores) and ends in an asterisk. This can then be used to
-	//prefix files.
+	// tempFilePatternRegExpString matches a string that is alphanumeric (with
+	// hypens or underscores) and ends in an asterisk. This can then be used to
+	// prefix files.
 	tempFilePatternRegExpString = "^[-a-zA-Z0-9_]*.[*]$"
 	tempFilePatternRegExp       *regexp.Regexp
 	tempFilePattern             = "executive-*"
@@ -32,17 +40,18 @@ var (
 	singleUse = false
 )
 
-//NewExecutable takes a compiled Script to generate a file that can be executed,
-//running the script. If none of the Script features are needed (such as
-//templates), this can be used directly with a nil originScript.
+// NewExecutable takes a compiled Script to generate a file that can be executed,
+// running the script. If none of the Script features are needed (such as
+// templates), this can be used directly with a nil originScript.
 func NewExecutable(originScript *Script, compiled string) (*Executable, error) {
 	executable := Executable{
-		OriginScript: *originScript,
-		scriptPath:   "",
-		env:          make([]string, 0),
-		args:         make([]string, 0),
-		workDir:      "",
-		singleUse:    false,
+		OriginScript:   *originScript,
+		scriptPath:     "",
+		compiledScript: compiled,
+		env:            make([]string, 0),
+		args:           make([]string, 0),
+		workDir:        "",
+		singleUse:      false,
 	}
 	scriptFile, err := os.CreateTemp("", tempFilePattern)
 	if err != nil {
@@ -58,9 +67,9 @@ func NewExecutable(originScript *Script, compiled string) (*Executable, error) {
 	return &executable, nil
 }
 
-//NewExecutableFromFile is similar to creating a script from file, however this
-//assumes the script is already "compiled" and so does not need to be parsed by
-//the template system.
+// NewExecutableFromFile is similar to creating a script from file, however this
+// assumes the script is already "compiled" and so does not need to be parsed by
+// the template system.
 func NewExecutableFromFile(path string) (*Executable, error) {
 	script, err := NewScriptFromFile("", path)
 	if err != nil {
@@ -69,9 +78,9 @@ func NewExecutableFromFile(path string) (*Executable, error) {
 	return NewExecutable(script, script.Raw)
 }
 
-//NewExecutableFromHTTP is similar to creating a script from a http endpoint, however this
-//assumes the script is already "compiled" and so does not need to be parsed by
-//the template system.
+// NewExecutableFromHTTP is similar to creating a script from a http endpoint,
+// however this assumes the script is already "compiled" and so does not need to
+// be parsed by the template system.
 func NewExecutableFromHTTP(link string) (*Executable, error) {
 	script, err := NewScriptFromHTTP("", link)
 	if err != nil {
@@ -80,9 +89,9 @@ func NewExecutableFromHTTP(link string) (*Executable, error) {
 	return NewExecutable(script, script.Raw)
 }
 
-//WithEnv sets an environment variable that should be set within the script's
-//runtime env. Executable is returned and not directly modified as to support
-//function chains.
+// WithEnv sets an environment variable that should be set within the script's
+// runtime env. Executable is returned and not directly modified as to support
+// function chains.
 func (e Executable) WithEnv(key, value string) Executable {
 	if e.env == nil {
 		e.env = make([]string, 0)
@@ -91,9 +100,10 @@ func (e Executable) WithEnv(key, value string) Executable {
 	return e
 }
 
-//WithArg adds an argument that will be provided to the script upon execution.
-//Args are provided to the script in the the order they are provided. Executable
-//is returned and not directly modified as to support function chains.
+// WithArg adds an argument that will be provided to the script upon execution.
+// Args are provided to the script in the the order they are provided.
+// Executable is returned and not directly modified as to support function
+// chains.
 func (e Executable) WithArg(arg string) Executable {
 	if e.args == nil {
 		e.args = make([]string, 0)
@@ -102,9 +112,9 @@ func (e Executable) WithArg(arg string) Executable {
 	return e
 }
 
-//WithOSEnv ensures that the script will be able to use the environment vars
-//from the os env. Executable is returned and not directly modified as to
-//support function chains.
+// WithOSEnv ensures that the script will be able to use the environment vars
+// from the os env. Executable is returned and not directly modified as to
+// support function chains.
 func (e Executable) WithOSEnv() Executable {
 	if e.env == nil {
 		e.env = make([]string, 0)
@@ -113,25 +123,25 @@ func (e Executable) WithOSEnv() Executable {
 	return e
 }
 
-//WithWorkDir sets the working directory for the context of the script.
-//Executable is returned and not directly modified as to support function
-//chains.
+// WithWorkDir sets the working directory for the context of the script.
+// Executable is returned and not directly modified as to support function
+// chains.
 func (e Executable) WithWorkDir(path string) Executable {
 	e.workDir = path
 	return e
 }
 
-//SingleUse sets the temporary file associated with the script to remove itself
-//immediately after it starts execution. This can help keep things neat, but can
-//also cause issues. Use carefully. Executable is returned to facilitate
-//function chinaing.
+// SingleUse sets the temporary file associated with the script to remove itself
+// immediately after it starts execution. This can help keep things neat, but
+// can also cause issues. Use carefully. Executable is returned to facilitate
+// function chinaing.
 func (e Executable) SingleUse() Executable {
 	e.singleUse = true
 	return e
 }
 
-//SetEnv sets an environment variable that should be set within the script's
-//runtime env.
+// SetEnv sets an environment variable that should be set within the script's
+// runtime env.
 func (e *Executable) SetEnv(key, value string) error {
 	if key == "" {
 		return fmt.Errorf("key must not be empty")
@@ -143,8 +153,8 @@ func (e *Executable) SetEnv(key, value string) error {
 	return nil
 }
 
-//SetArgs defines all the args that will be provided to the script upon
-//execution. This overwrites any changes made via WithArg.
+// SetArgs defines all the args that will be provided to the script upon
+// execution. This overwrites any changes made via WithArg.
 func (e *Executable) SetArgs(args []string) error {
 	if args == nil {
 		return fmt.Errorf("arguments must not be empty")
@@ -158,8 +168,8 @@ func (e *Executable) SetArgs(args []string) error {
 	return nil
 }
 
-//SetOSEnv ensures that the script will be able to use the environment vars
-//from the os env.
+// SetOSEnv ensures that the script will be able to use the environment vars
+// from the os env.
 func (e *Executable) SetOSEnv() {
 	if e.env == nil {
 		e.env = make([]string, 0)
@@ -167,31 +177,33 @@ func (e *Executable) SetOSEnv() {
 	e.env = append(e.env, os.Environ()...)
 }
 
-//SetWorkDir sets the working directory for the context of the script.
+// SetWorkDir sets the working directory for the context of the script. This
+// does not check if the directory exists in order to be compatible with
+// non-local execution.
 func (e *Executable) SetWorkDir(path string) error {
-	if info, err := os.Stat(path); err != nil {
-		return fmt.Errorf("failed to get directory info: %w", err)
-	} else if !info.IsDir() {
-		return fmt.Errorf("working directory must be a directory")
-	}
+	// if info, err := os.Stat(path); err != nil {
+	// 	return fmt.Errorf("failed to get directory info: %w", err)
+	// } else if !info.IsDir() {
+	// 	return fmt.Errorf("working directory must be a directory")
+	// }
 	e.workDir = path
 	return nil
 }
 
-//SetSingleUse sets the temporary file associated with the script to remove itself
-//immediately after it starts execution. This can help keep things neat, but can
-//also cause issues. Use carefully. Executable is returned to facilitate
-//function chinaing.
+// SetSingleUse sets the temporary file associated with the script to remove
+// itself immediately after it starts execution. This can help keep things neat,
+// but can also cause issues. Use carefully. Executable is returned to
+// facilitate function chinaing.
 func (e *Executable) SetSingleUse(isSingleUse bool) {
 	e.singleUse = isSingleUse
 }
 
-//Execute simply runs the "compiled" script with the env and workdir given. If
-//the process returned is nil the process failed to start. If a single use
-//script fails to be removed, the process is still returned along with the
-//error.
-func (e Executable) Execute() (*Process, error) {
-	process := Process{
+// Execute simply runs the "compiled" script with the env and workdir given. If
+// the process returned is nil the process failed to start. If a single use
+// script fails to be removed, the process is still returned along with the
+// error.
+func (e Executable) Execute() (Process, error) {
+	process := LocalProcess{
 		OriginExecutable: e,
 		cmd:              exec.Command(e.scriptPath),
 	}
@@ -219,9 +231,107 @@ func (e Executable) Execute() (*Process, error) {
 	return &process, nil
 }
 
-//Remove simply deletes the temporary file that is generated upon creation of an
-//Executable. Doing so is not vital as the file is stored in a temporary dir,
-//but it can help long running programs that frequently use executive.
+// ExecuteOverSSH simply runs the "compiled" script with the env vars provided.
+// To run over SSH, some configuration must be supplied, including the remote
+// user, the target ssh server address (and port), and an SSH auth method (such
+// as a password). If the process returned is nil the process failed to start.
+// If a single use script fails to be removed, the process is still returned
+// along with the error. Note that WorkDir is not supported for SSH.
+func (e Executable) ExecuteOverSSH(user, addr string, auth ssh.AuthMethod) (Process, error) {
+	process := SSHProcess{
+		OriginExecutable: e,
+	}
+	config := ssh.ClientConfig{
+		User: user,
+		Auth: []ssh.AuthMethod{
+			auth,
+		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+	client, err := ssh.Dial("tcp", addr, &config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make ssh connection: %w", err)
+	}
+	process.sshClient = client
+	session, err := client.NewSession()
+	if err != nil {
+		client.Close()
+		return nil, fmt.Errorf("failed to make ssh session: %w", err)
+	}
+	process.sshSession = session
+	for _, kv := range e.env {
+		kvPair := strings.Split(kv, "=")
+		if len(kvPair) == 2 {
+			if err := session.Setenv(kvPair[0], kvPair[1]); err != nil {
+				session.Close()
+				client.Close()
+				return nil, fmt.Errorf("failed to set env %s: %w", kv, err)
+			}
+		}
+	}
+	session.Stdout = &process.stdoutBytes
+	session.Stderr = &process.stderrBytes
+	if process.stdin, err = session.StdinPipe(); err != nil {
+		session.Close()
+		client.Close()
+		return nil, fmt.Errorf("failed to connect to stdin: %w", err)
+	}
+	if err := session.Start(e.compiledScript); err != nil {
+		session.Close()
+		client.Close()
+		return nil, fmt.Errorf("failed to start script: %w", err)
+	}
+	return &process, err
+}
+
+// ExecuteOverDocker simply runs the "compiled" script with the env vars and
+// workdir provided. To run over Docker, some configuration must be supplied,
+// including a docker client linked to the releveant docker host, the container
+// ID that the script should be executed on, and a subprocess command to execute
+// the script. In many cases, the subprocess command 'sh -c' will suffice, but
+// others such as '/bin/bash -c' can also be used. The limitations here come
+// from interrupts: docker processes will not support them.
+func (e Executable) ExecuteOverDocker(client *docker.Client, containerID string, subprocessCmd string) (Process, error) {
+	process := DockerProcess{
+		OriginExecutable: e,
+		dockerClient:     client,
+		complete:         make(chan error),
+	}
+	config := types.ExecConfig{
+		Tty:          false,
+		AttachStdin:  true,
+		AttachStderr: true,
+		AttachStdout: true,
+		Env:          e.env,
+		Cmd:          append(strings.Fields(subprocessCmd), e.compiledScript),
+	}
+	if e.workDir != "" {
+		config.WorkingDir = e.workDir
+	}
+	idResponse, err := client.ContainerExecCreate(context.Background(), containerID, config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create docker exec: %w", err)
+	}
+	execID := idResponse.ID
+	process.commandID = execID
+	if conn, err := client.ContainerExecAttach(context.Background(), execID, types.ExecStartCheck{}); err != nil {
+		return nil, fmt.Errorf("failed to attach to docker exec: %w", err)
+	} else {
+		process.dockerConn = &conn
+		go func() {
+			_, err := stdcopy.StdCopy(&process.stdoutBytes, &process.stderrBytes, conn.Reader)
+			process.complete <- err
+		}()
+	}
+	if err := client.ContainerExecStart(context.Background(), execID, types.ExecStartCheck{}); err != nil {
+		return nil, fmt.Errorf("failed to start docker exec: %w", err)
+	}
+	return &process, nil
+}
+
+// Remove simply deletes the temporary file that is generated upon creation of
+// an Executable. Doing so is not vital as the file is stored in a temporary
+// dir, but it can help long running programs that frequently use executive.
 func (e *Executable) Remove() error {
 	if !e.ScriptPathExists() {
 		return nil
@@ -232,17 +342,17 @@ func (e *Executable) Remove() error {
 	return nil
 }
 
-//ScriptPath simply returns the path containing the temporary file of the
-//script.
+// ScriptPath simply returns the path containing the temporary file of the
+// script.
 func (e Executable) ScriptPath() string {
 	return e.scriptPath
 }
 
-//ScriptPathExists simply returns a bool representing the existence of the
-//temporary script file (without discoling errors). THis can be used to
-//determine if the executable has been removed. In the case where Stat returns
-//an error that is not ErrNotExist, this assumes the file does exist as to allow
-//for remove to operate more optimistically.
+// ScriptPathExists simply returns a bool representing the existence of the
+// temporary script file (without discoling errors). THis can be used to
+// determine if the executable has been removed. In the case where Stat returns
+// an error that is not ErrNotExist, this assumes the file does exist as to
+// allow for remove to operate more optimistically.
 func (e Executable) ScriptPathExists() bool {
 	if fileInfo, err := os.Stat(e.scriptPath); errors.Is(err, os.ErrNotExist) || fileInfo.IsDir() {
 		return false
@@ -250,10 +360,10 @@ func (e Executable) ScriptPathExists() bool {
 	return true
 }
 
-//SetTempFilePrefix defines the prefix pattern for the temporary files created
-//when "compiling" scripts into "executables". Any prefix must be only
-//alphanumeric, with hypens and underscores permitted. It also must end in a
-//single asterisk.
+// SetTempFilePrefix defines the prefix pattern for the temporary files created
+// when "compiling" scripts into "executables". Any prefix must be only
+// alphanumeric, with hypens and underscores permitted. It also must end in a
+// single asterisk.
 func SetTempFilePrefix(prefixPattern string) error {
 	if !tempFilePatternRegExp.MatchString(prefixPattern) {
 		return fmt.Errorf("prefix pattern is not valid")

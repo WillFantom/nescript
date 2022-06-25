@@ -1,10 +1,7 @@
 package executive
 
 import (
-	"fmt"
 	"time"
-
-	"github.com/antonmedv/expr"
 )
 
 //Result represents the output of a completed script execution. This is only
@@ -12,28 +9,33 @@ import (
 //exited. The time metrics included are from the process and do not incorporate
 //the time used by executive.
 type Result struct {
-	StdOut   string         `json:"stdout"`
-	StdErr   string         `json:"stderr"`
-	Outputs  map[string]any `json:"outputs"`
-	ExitCode int            `json:"exitCode"`
+	StdOut   string `json:"stdout"`
+	StdErr   string `json:"stderr"`
+	ExitCode int    `json:"exitCode"`
 
 	TotalTime  time.Duration `json:"executionTime"`
 	SystemTime time.Duration
 	UserTime   time.Duration
 }
 
-func (r Result) Evaluate(expression string) (bool, error) {
-	program, err := expr.Compile(expression, expr.Env(r.Outputs), expr.AsBool())
-	if err != nil {
-		return false, fmt.Errorf("expression compilation failed: %w", err)
+// Output parses the specified outputs from the script's stdOut (or stdErr if
+// specified). This is returned as a map. Any field that is not correctly
+// parsed, will simply be ignored.
+func (r Result) Output(useErr bool) Output {
+	if useErr {
+		return NewOutput(r.StdErr)
 	}
-	output, err := expr.Run(program, r.Outputs)
-	if err != nil {
-		return false, fmt.Errorf("expression evaluation failed: %w", err)
+	return NewOutput(r.StdOut)
+}
+
+// Output parses the specified outputs from the script's stdOut and stdErr. In
+// the event that stdOut and stdErr specify an output of the same name, the
+// value from stdOut is preferred. This is returned as a map. Any field that is
+// not correctly parsed, will simply be ignored.
+func (r Result) CombinedOutput() Output {
+	output := NewOutput(r.StdErr)
+	for k, v := range NewOutput(r.StdOut) {
+		output[k] = v
 	}
-	if o, ok := output.(bool); ok {
-		return o, nil
-	} else {
-		return false, fmt.Errorf("expression output was non-boolean")
-	}
+	return output
 }
