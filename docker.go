@@ -14,7 +14,7 @@ import (
 // found on local processes. For example, DockerProcess does not support a
 // signals.
 type DockerProcess struct {
-	OriginExecutable Executable
+	OriginExecutable Script
 
 	dockerClient *docker.Client
 	dockerConn   *types.HijackedResponse

@@ -12,7 +12,7 @@ import (
 // Process represents a single instance of the script running or completed on the
 // local device.
 type LocalProcess struct {
-	OriginExecutable Executable
+	OriginExecutable Script
 
 	cmd         *exec.Cmd
 	stdin       io.Writer

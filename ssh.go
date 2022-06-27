@@ -12,7 +12,7 @@ import (
 // script. Note that scripts over SSH have some limitations not found on local
 // processes. For example, SSHProcess does not support a WorkDir.
 type SSHProcess struct {
-	OriginExecutable Executable
+	OriginExecutable Script
 
 	sshSession  *ssh.Session
 	sshClient   *ssh.Client
