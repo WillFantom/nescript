@@ -1,21 +1,17 @@
-package executive
+package docker
 
 import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/docker/docker/api/types"
 	docker "github.com/docker/docker/client"
+	"github.com/willfantom/nescript"
 )
 
-// DockerProcess represents a single instance of the executed on a docker
-// container. script. Note that scripts over Docker have some limitations not
-// found on local processes. For example, DockerProcess does not support a
-// signals.
 type DockerProcess struct {
-	OriginExecutable Script
-
 	dockerClient *docker.Client
 	dockerConn   *types.HijackedResponse
 	commandID    string
@@ -25,35 +21,38 @@ type DockerProcess struct {
 }
 
 func (p *DockerProcess) Kill() error {
-	return fmt.Errorf("not availbale over docker")
+	return fmt.Errorf("can not kill docker exec process")
 }
 
-func (p *DockerProcess) SigInt() error {
-	return fmt.Errorf("not availbale over docker")
-
+func (p *DockerProcess) Signal(s os.Signal) error {
+	return fmt.Errorf("can not signal docker exec process")
 }
 
 func (p *DockerProcess) Write(input string) error {
 	if _, err := p.dockerConn.Conn.Write([]byte(input)); err != nil {
-		return fmt.Errorf("failed to write to stdin: %w", err)
+		return fmt.Errorf("failed to write to container exec stdin: %w", err)
 	}
 	return nil
 }
 
-func (p *DockerProcess) Result() (*Result, error) {
-	defer p.dockerConn.Close()
+func (p *DockerProcess) Result() (*nescript.Result, error) {
+	defer p.Close()
 	err := <-p.complete
 	if err != nil {
 		return nil, fmt.Errorf("failed to wait for docker process: %w", err)
 	}
 	res, err := p.dockerClient.ContainerExecInspect(context.Background(), p.commandID)
 	if err != nil {
-		return nil, fmt.Errorf("could not determin exit code: %w", err)
+		return nil, fmt.Errorf("could not determine exit code: %w", err)
 	}
-	result := Result{
+	result := nescript.Result{
 		StdOut: string(p.stdoutBytes.String()),
 		StdErr: string(p.stderrBytes.String()),
 	}
 	result.ExitCode = res.ExitCode
 	return &result, nil
+}
+
+func (p *DockerProcess) Close() {
+	p.dockerConn.Close()
 }

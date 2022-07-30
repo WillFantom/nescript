@@ -1,19 +1,18 @@
-package executive
+package ssh
 
 import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 
+	"github.com/willfantom/nescript"
 	"golang.org/x/crypto/ssh"
 )
 
-// SSHProcess represents a single instance of the remotely executed (ssh)
-// script. Note that scripts over SSH have some limitations not found on local
-// processes. For example, SSHProcess does not support a WorkDir.
+// Process represents a single instance of the script running or completed on
+// the local device.
 type SSHProcess struct {
-	OriginExecutable Script
-
 	sshSession  *ssh.Session
 	sshClient   *ssh.Client
 	stdin       io.Writer
@@ -28,9 +27,9 @@ func (p *SSHProcess) Kill() error {
 	return nil
 }
 
-func (p *SSHProcess) SigInt() error {
-	if err := p.sshSession.Signal(ssh.SIGINT); err != nil {
-		return fmt.Errorf("failed to send sigint to process: %w", err)
+func (p *SSHProcess) Signal(s os.Signal) error {
+	if err := p.sshSession.Signal(ssh.Signal(s.String())); err != nil {
+		return fmt.Errorf("failed to send signal to process: %w", err)
 	}
 	return nil
 }
@@ -42,7 +41,7 @@ func (p *SSHProcess) Write(input string) error {
 	return nil
 }
 
-func (p *SSHProcess) Result() (*Result, error) {
+func (p *SSHProcess) Result() (*nescript.Result, error) {
 	defer p.sshSession.Close()
 	defer p.sshClient.Close()
 	exitCode := 0
@@ -53,10 +52,15 @@ func (p *SSHProcess) Result() (*Result, error) {
 			exitCode = eerr.ExitStatus()
 		}
 	}
-	result := Result{
+	result := nescript.Result{
 		StdOut: string(p.stdoutBytes.String()),
 		StdErr: string(p.stderrBytes.String()),
 	}
 	result.ExitCode = exitCode
 	return &result, nil
+}
+
+func (p *SSHProcess) Close() {
+	p.sshSession.Close()
+	p.sshClient.Close()
 }

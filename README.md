@@ -1,15 +1,18 @@
-# Executive
+# NEScript
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/willfantom/executive.svg)](https://pkg.go.dev/github.com/willfantom/executive) ![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/willfantom/executive?label=Latest%20Version&sort=semver&style=flat-square) 
 
-[`os.exec`](https://pkg.go.dev/os/exec), but a little fancier! A simple wrapper providing extra functionality and cleaner usage when using it heavily.
+<!-- TODO: Add NES repo link -->
+Add automation to your network emulation workflows with [NES]() & NEScript 🚀
+
+An [`os.exec`](https://pkg.go.dev/os/exec) wrapper providing extra functionality and cleaner usage when using it heavily.
 
 Added features include:
  - Support for handlebar values in scripts ([go templates](https://pkg.go.dev/text/template))
  - Function chaining for cleaner code
- - Complex output parsing
+ - Complex GitHub Actions style output parsing
  - Dynamic evaluation of output using expressions ([expr](https://github.com/antonmedv/expr))
- - Script execution on the local machine, ssh target, or docker container
+ - Script execution on the local machine, ssh target, or docker container (plugin-friendly 🔌)
 
 ---
 
@@ -17,11 +20,11 @@ Added features include:
 
 Executive is divided into 5 core components:
 
- - **Template**: A template is a normal script file that can also contain handlebars for use with Go's [templating engine](https://pkg.go.dev/text/template). These can be more powerful than simple ENV vars (although this still allows for ENV vars to be set), as they are script language agnostic and support features such as loops.
- - **Script**: A script is somewhat self explantory. A script can either be created from a source (string, file, http), or be a 'compiled' template. A script is not executed upon creation. When executing a script, a remote target can be optionally specified.
+ - **Script**: A script is somewhat self explantory. A script can either be created from a source (string, file, http), and can contain [template engine](https://pkg.go.dev/text/template) handlebars (awesome for loops, etc...). A script is not executed upon creation, instead further configuration can be set. When executing a script, a specific Executor should be specified (allowing for local & non-local execution).
+ - **Executor**: A plugin that allows for scripts to be executed in many ways. Provided is a local executor (that just runs the script on the local machine), ssh executor (that executes the script on a remote SSH target), and a docker executor (for executing scripts on a docker container).
  - **Process**: A process is an executing or executed script instance. Calling for a `Result` from this will wait for execution to be complete. 
  - **Result**: A result is the output of an executed script, including the exit code, stdout and stderr.
- - **Output**: Output is key/value mapping of explicitly set outputs. This is done similiarly to github actions, where outputs are picked up from stdout/stderr with a prefix similar to `::set-output name=example::...`. As these values can be typed (string, int, json), they can also be evaluated based on expressions.
+ - **Output**: Output is key/value mapping of explicitly set outputs. This is done similarly to github actions, where outputs are picked up from stdout/stderr with a prefix similar to `::set-output name=example::...`. As these values can be typed (string, int, JSON), they can also be evaluated based on expressions.
 
 ---
 
@@ -31,14 +34,13 @@ Executive is divided into 5 core components:
 
 Using templates in scripts is easy, just have a handlebar value in the script named as desired. For example:
 ```bash
-#!/bin/bash
 {{.Command}} "Hello, {{.Name}}"
 ```
 
 Then to set the value to replace `{{.Name}}`, the following go code can be used:
 ```go
 ...
-script, err := myTemplate.WithField("Command", "echo").WithField("Name", "world").Compile()
+script, err := NewScript('{{.Command}} "Hello, {{.Name}}"').WithField("Command", "echo").WithField("Name", "world").Compile()
 if err != nil {
 	panic(err)
 }
@@ -47,12 +49,11 @@ if err != nil {
 
 The templating system powering this supports other features too, such as loops when fields are slices of data etc...
 
+> Shebangs (`#!/bin/bash` etc...) should not be used as these can be hard to use on certain executors. Instead, NEScript allows for a sub-command to be set, for example `sh -c`, where the script is provided as the last argument. This overall seems to be a more portable approach.
+
 ### Remote Execution
 
-Scripts can be executed on your local machine when the `Execute` method is called, However, they can also be executed (with some limitations) on remote entities, such as SSH targets and Docker containers. 
-
-- **SSH**: Replace `Execute()` with `ExecuteOverSSH("username", "10.0.0.1:22", ssh.Password("mysecurepassword"))`. Any ssh auth can be used, including key-based auth.
-- **Docker**: Replace `Execute()` with `ExecuteOverDocker(cli, "containerid", "sh -c")`, where `cli` is a configured docker client and `"sh -c"` is the subprocess in which the script is passes as the next argument (a common alternative might be `/bin/bash -c`).
+Scripts require an `Executor` to actually be executed. There are the 3 provided, but more can easily be created. Executors, such as SSH, can have required configuration parameters.
 
 The limitations are that optional working directories for script execution are not available when executing over SSH, and signals such as SIGINT are not supported when using a remote Docker target.
 
@@ -66,12 +67,12 @@ If specific output is desired to be able to evaluate a response to a script, thi
 echo ::set-output name=Hello::world
 ```
 
-By default all outputted keys and values are considered to be string types. Optionally, a value can be an int, or a json structure. For example:
+By default, all outputted keys and values are considered to be string types. Optionally, a value can be an int, or a JSON structure. For example:
 
 - **INT**: 		`echo ::set-output name=example type=int::42`
 - **JSON**: 	`echo ::set-output name=example type=json::{"sometext": "json", "anumber": 42}` 
 
-Script resuts can then be programatically evaluated to boolean values using expressions. For example, to ensure the number set in the above JSON example is 42, the expression could be given:
+Script results can then be programmatically evaluated to boolean values using expressions. For example, to ensure the number set in the above JSON example is 42, the expression could be given:
 
 ```go
 ...
