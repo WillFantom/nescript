@@ -1,4 +1,4 @@
-module github.com/willfantom/executive
+module github.com/willfantom/nescript
 
 go 1.18
 

@@ -3,36 +3,27 @@ package main
 import (
 	"fmt"
 
-	"github.com/willfantom/executive"
+	"github.com/willfantom/nescript"
+	"github.com/willfantom/nescript/local"
 )
 
-var scriptText string = `#!/bin/bash
-{{.Command}} "Hello, "$WHO"!"
+var scriptText string = `{{.Command}} "Hello, "$WHO"!"
 echo "::set-output name=exampleNumber type=int::42"
 `
 
 func main() {
-	template, err := executive.NewTemplate("example", scriptText)
+
+	script := nescript.NewScript(scriptText)
+	process, err := script.WithField("Command", "echo").WithEnv("WHO=world").CompileExec(local.NewExecutor())
 	if err != nil {
 		panic(err)
 	}
-
-	script, err := template.WithField("Command", "echo").Compile()
-	if err != nil {
-		panic(err)
-	}
-
-	// sets the env var "WHO" to world and executes the script locally. could also
-	// be executed in a docker container or over ssh.
-	process, err := script.WithEnv("WHO", "world").Execute()
-	if err != nil {
-		panic(err)
-	}
-
+	defer process.Close()
 	result, err := process.Result()
 	if err != nil {
 		panic(err)
 	}
+	fmt.Println(result.StdOut)
 
 	if correct, err := result.CombinedOutput().Evaluate("exampleNumber == 42"); err == nil && correct {
 		fmt.Println("the number in the output was 42, as expected")

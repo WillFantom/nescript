@@ -1,4 +1,6 @@
-package executive
+package nescript
+
+import "os"
 
 // Process is a single instance of the script, either running or exited. A
 // process can be used to control the script and extract results from a script
@@ -8,9 +10,10 @@ type Process interface {
 	// the process is not running, this will return an error.
 	Kill() error
 
-	// SigInt sends a SIGINT to the running process. If this fails, for example if
-	// the process is not running, this will return an error.
-	SigInt() error
+	// Signal sends a signal (such as SIGINT) to the running process. If this
+	// fails, for example if the process is not running, this will return an
+	// error.
+	Signal(os.Signal) error
 
 	// Write sends a string to the process's STDIN. Note that the string is sent
 	// as-is. Thus if the program is looking for a newline before the read is
@@ -21,4 +24,8 @@ type Process interface {
 	// Result waits for a script to complete execution, then a result is returned.
 	// If the script returns an unknown error, this will also error.
 	Result() (*Result, error)
+
+	// Close should be called on a process, freeing any resources used where
+	// appropriate.
+	Close()
 }
