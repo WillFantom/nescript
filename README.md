@@ -21,7 +21,7 @@ Added features include:
 Executive is divided into 5 core components:
 
  - **Script**: A script is somewhat self explantory. A script can either be created from a source (string, file, http), and can contain [template engine](https://pkg.go.dev/text/template) handlebars (awesome for loops, etc...). A script is not executed upon creation, instead further configuration can be set. When executing a script, a specific Executor should be specified (allowing for local & non-local execution).
- - **Executor**: A plugin that allows for scripts to be executed in many ways. Provided is a local executor (that just runs the script on the local machine), ssh executor (that executes the script on a remote SSH target), and a docker executor (for executing scripts on a docker container).
+ - **ExecFunc**: A plugin that allows for scripts to be executed in many ways. Provided is a local executor (that just runs the script on the local machine), ssh executor (that executes the script on a remote SSH target), and a docker executor (for executing scripts on a docker container).
  - **Process**: A process is an executing or executed script instance. Calling for a `Result` from this will wait for execution to be complete. 
  - **Result**: A result is the output of an executed script, including the exit code, stdout and stderr.
  - **Output**: Output is key/value mapping of explicitly set outputs. This is done similarly to github actions, where outputs are picked up from stdout/stderr with a prefix similar to `::set-output name=example::...`. As these values can be typed (string, int, JSON), they can also be evaluated based on expressions.
@@ -53,7 +53,7 @@ The templating system powering this supports other features too, such as loops w
 
 ### Remote Execution
 
-Scripts require an `Executor` to actually be executed. There are the 3 provided, but more can easily be created. Executors, such as SSH, can have required configuration parameters.
+Scripts require an `ExecFunc` to actually be executed. There are the 3 provided, but more can easily be created. Executors, such as SSH, can have required configuration parameters.
 
 The limitations are that optional working directories for script execution are not available when executing over SSH, and signals such as SIGINT are not supported when using a remote Docker target.
 

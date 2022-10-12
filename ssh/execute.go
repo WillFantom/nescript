@@ -8,44 +8,25 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-type SSHExecutor struct {
-	subCommand []string
-	target     string
-	config     *ssh.ClientConfig
-	sanitizer  func([]string, string) string
-}
-
 var (
-	defaultSubCmd = []string{"sh", "-c"}
+	defaultSubcommand = []string{"sh", "-c"}
 )
 
-func NewExecutor(target string, c *ssh.ClientConfig) *SSHExecutor {
-	return &SSHExecutor{
-		subCommand: defaultSubCmd,
-		target:     target,
-		config:     c,
-		sanitizer: func(sub []string, script string) string {
-			return fmt.Sprintf("%s '%s'", strings.Join(sub, " "), script)
-		},
+func Executor(target string, config *ssh.ClientConfig, subcommand []string) nescript.ExecFunc {
+	if subcommand == nil {
+		subcommand = defaultSubcommand
 	}
-}
-
-func (sshe SSHExecutor) ExecFunc() (nescript.ExecFunc, error) {
-	if len(sshe.subCommand) == 0 {
-		return nil, fmt.Errorf("no sub-command for script execution was provided")
-	}
-
 	return func(s nescript.Script) (nescript.Process, error) {
 		process := SSHProcess{}
-		sshClient, err := ssh.Dial("tcp", sshe.target, sshe.config)
+		sshClient, err := ssh.Dial("tcp", target, config)
 		if err != nil {
-			return nil, fmt.Errorf("failed to connect to ssh target '%s': %w", sshe.target, err)
+			return nil, fmt.Errorf("failed to connect to ssh target '%s': %w", target, err)
 		}
 		process.sshClient = sshClient
 		sshSession, err := sshClient.NewSession()
 		if err != nil {
 			sshClient.Close()
-			return nil, fmt.Errorf("failed to create ssh session on targer '%s': %w", sshe.target, err)
+			return nil, fmt.Errorf("failed to create ssh session on target '%s': %w", target, err)
 		}
 		process.sshSession = sshSession
 		for _, e := range s.Env() {
@@ -66,11 +47,10 @@ func (sshe SSHExecutor) ExecFunc() (nescript.ExecFunc, error) {
 		} else {
 			process.stdin = stdin
 		}
-
-		if err := sshSession.Start(sshe.sanitizer(sshe.subCommand, s.Raw())); err != nil {
+		if err := sshSession.Start(fmt.Sprintf("%s '%s'", strings.Join(subcommand, " "), s.Raw())); err != nil {
 			process.Close()
 			return nil, fmt.Errorf("process failed to start: %w", err)
 		}
 		return &process, nil
-	}, nil
+	}
 }

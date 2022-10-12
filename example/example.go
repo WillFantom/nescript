@@ -14,7 +14,7 @@ echo "::set-output name=exampleNumber type=int::42"
 func main() {
 
 	script := nescript.NewScript(scriptText)
-	process, err := script.WithField("Command", "echo").WithEnv("WHO=world").CompileExec(local.NewExecutor())
+	process, err := script.WithField("Command", "echo").WithEnv("WHO=world").CompileExec(local.Executor("", nil))
 	if err != nil {
 		panic(err)
 	}

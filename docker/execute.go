@@ -10,30 +10,14 @@ import (
 	"github.com/willfantom/nescript"
 )
 
-type DockerExecutor struct {
-	subCommand   []string
-	dockerClient *docker.Client
-	containerID  string
-	workDir      string
-}
-
 var (
-	defaultSubCmd = []string{"sh", "-c"}
+	defaultSubcommand = []string{"sh", "-c"}
 )
 
-func NewExecutor(client *docker.Client, containerID string) *DockerExecutor {
-	return &DockerExecutor{
-		subCommand:   defaultSubCmd,
-		dockerClient: client,
-		containerID:  containerID,
+func Executor(subcommand []string, client *docker.Client, workdir, containerID string) nescript.ExecFunc {
+	if subcommand == nil {
+		subcommand = defaultSubcommand
 	}
-}
-
-func (de DockerExecutor) ExecFunc() (nescript.ExecFunc, error) {
-	if len(de.subCommand) == 0 {
-		return nil, fmt.Errorf("no sub-command for script execution was provided")
-	}
-
 	return func(s nescript.Script) (nescript.Process, error) {
 		config := types.ExecConfig{
 			Tty:          false,
@@ -41,19 +25,19 @@ func (de DockerExecutor) ExecFunc() (nescript.ExecFunc, error) {
 			AttachStderr: true,
 			AttachStdout: true,
 			Env:          s.Env(),
-			WorkingDir:   de.workDir,
-			Cmd:          append(de.subCommand, s.Raw()),
+			WorkingDir:   workdir,
+			Cmd:          append(subcommand, s.Raw()),
 		}
-		idResponse, err := de.dockerClient.ContainerExecCreate(context.Background(), de.containerID, config)
+		idResponse, err := client.ContainerExecCreate(context.Background(), containerID, config)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create docker exec in container '%s': %w", de.containerID, err)
+			return nil, fmt.Errorf("failed to create docker exec in container '%s': %w", containerID, err)
 		}
 		process := DockerProcess{
-			dockerClient: de.dockerClient,
+			dockerClient: client,
 			commandID:    idResponse.ID,
 			complete:     make(chan error),
 		}
-		if conn, err := de.dockerClient.ContainerExecAttach(context.Background(), process.commandID, types.ExecStartCheck{}); err != nil {
+		if conn, err := client.ContainerExecAttach(context.Background(), process.commandID, types.ExecStartCheck{}); err != nil {
 			return nil, fmt.Errorf("failed to attach to docker exec: %w", err)
 		} else {
 			process.dockerConn = &conn
@@ -62,10 +46,10 @@ func (de DockerExecutor) ExecFunc() (nescript.ExecFunc, error) {
 				process.complete <- err
 			}()
 		}
-		if err := de.dockerClient.ContainerExecStart(context.Background(), process.commandID, types.ExecStartCheck{}); err != nil {
+		if err := client.ContainerExecStart(context.Background(), process.commandID, types.ExecStartCheck{}); err != nil {
 			return nil, fmt.Errorf("failed to start docker exec: %w", err)
 		}
 		return &process, nil
 
-	}, nil
+	}
 }

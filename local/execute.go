@@ -7,34 +7,25 @@ import (
 	"github.com/willfantom/nescript"
 )
 
-type LocalExecutor struct {
-	subCommand []string
-	workdir    string
-}
-
 var (
-	defaultSubCmd = []string{"sh", "-c"}
+	defaultSubcommand = []string{"sh", "-c"}
 )
 
-func NewExecutor() *LocalExecutor {
-	return &LocalExecutor{
-		subCommand: defaultSubCmd,
-		workdir:    "",
+// Executor returns an exec func that can execute a NEScript locally. A
+// subcommand can be provided for the script (e.g. ["sh", "-c"]) or if nil, the
+// default will be used. Also a working directory can be set, that if left empty
+// will be set to the current working directory.
+func Executor(workdir string, subcommand []string) nescript.ExecFunc {
+	if subcommand == nil {
+		subcommand = defaultSubcommand
 	}
-}
-
-func (le LocalExecutor) ExecFunc() (nescript.ExecFunc, error) {
-	if len(le.subCommand) == 0 {
-		return nil, fmt.Errorf("no sub-command for script execution was provided")
-	}
-
 	return func(s nescript.Script) (nescript.Process, error) {
-		command := append(le.subCommand, s.Raw())
+		command := append(subcommand, s.Raw())
 		process := LocalProcess{
 			cmd: exec.Command(command[0], command[1:]...),
 		}
 		process.cmd.Env = s.Env()
-		process.cmd.Dir = le.workdir
+		process.cmd.Dir = workdir
 		process.cmd.Stdout = &process.stdoutBytes
 		process.cmd.Stderr = &process.stderrBytes
 		if stdin, err := process.cmd.StdinPipe(); err != nil {
@@ -46,5 +37,5 @@ func (le LocalExecutor) ExecFunc() (nescript.ExecFunc, error) {
 			return nil, fmt.Errorf("process failed to start: %w", err)
 		}
 		return &process, nil
-	}, nil
+	}
 }
