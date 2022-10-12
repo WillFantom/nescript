@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/willfantom/nescript"
+	"github.com/willfantom/nescript/expr"
 	"github.com/willfantom/nescript/local"
 )
 
@@ -25,7 +26,7 @@ func main() {
 	}
 	fmt.Println(result.StdOut)
 
-	if correct, err := result.CombinedOutput().Evaluate("exampleNumber == 42"); err == nil && correct {
+	if correct, err := result.CombinedOutput().Evaluate(expr.EvalFunc(), "exampleNumber == 42"); err == nil && correct {
 		fmt.Println("the number in the output was 42, as expected")
 	} else if err == nil && !correct {
 		fmt.Println("the number in the output was not 42")

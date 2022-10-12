@@ -11,7 +11,7 @@ Added features include:
  - Support for handlebar values in scripts ([go templates](https://pkg.go.dev/text/template))
  - Function chaining for cleaner code
  - Complex GitHub Actions style output parsing
- - Dynamic evaluation of output using expressions ([expr](https://github.com/antonmedv/expr))
+ - Dynamic evaluation of output using expressions (plugin-friendly 🔌)
  - Script execution on the local machine, ssh target, or docker container (plugin-friendly 🔌)
 
 ---
@@ -72,7 +72,7 @@ By default, all outputted keys and values are considered to be string types. Opt
 - **INT**: 		`echo ::set-output name=example type=int::42`
 - **JSON**: 	`echo ::set-output name=example type=json::{"sometext": "json", "anumber": 42}` 
 
-Script results can then be programmatically evaluated to boolean values using expressions. For example, to ensure the number set in the above JSON example is 42, the expression could be given:
+Script results can then be programmatically evaluated to boolean values using expression functions (currently only a [expr](https://github.com/antonmedv/expr) plugin is available). For example, to ensure the number set in the above JSON example is 42, the expression could be given:
 
 ```go
 ...

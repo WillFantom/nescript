@@ -2,17 +2,16 @@ package nescript
 
 import (
 	"encoding/json"
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/antonmedv/expr"
 )
 
 // Output is a key/value map of data, where the value can be any type. This
 // should be generated from NewOutput or from the helper methods of a result.
 type Output map[string]any
+
+type EvalFunc func(Output, string) (bool, error)
 
 var (
 	// setOutputRegex determines the allowed syntax for a line outputting data.
@@ -51,21 +50,10 @@ func NewOutput(source string) Output {
 	return outputs
 }
 
-// Evaluate takes an expr expression and uses the output data given to evaluate
-// to a boolean. This will error is the expression can not be evaulation with
-// the given data, or the output would not be a boolean.
-func (o Output) Evaluate(expression string) (bool, error) {
-	program, err := expr.Compile(expression, expr.Env(o), expr.AsBool())
-	if err != nil {
-		return false, fmt.Errorf("expression compilation failed: %w", err)
-	}
-	output, err := expr.Run(program, o)
-	if err != nil {
-		return false, fmt.Errorf("expression evaluation failed: %w", err)
-	}
-	if o, ok := output.(bool); ok {
-		return o, nil
-	} else {
-		return false, fmt.Errorf("expression output was non-boolean")
-	}
+// Evaluate takes an evaultion function (such as expr) and a string expression
+// and uses the output data given to evaluate to a boolean. This will error is
+// the expression can not be evaluation with the given data, or the output would
+// not be a boolean.
+func (o Output) Evaluate(evaluator EvalFunc, expression string) (bool, error) {
+	return evaluator(o, expression)
 }
