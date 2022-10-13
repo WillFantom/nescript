@@ -7,7 +7,8 @@ import (
 	"github.com/willfantom/nescript"
 )
 
-// EvalFunc returns a evaluation function that will use the expr package to evaluate the
+// EvalFunc returns a evaluation function that will use the expr package to
+// evaluate a given expression using the data provided from the output.
 func EvalFunc() nescript.EvalFunc {
 	return func(o nescript.Output, e string) (bool, error) {
 		program, err := expr.Compile(e, expr.Env(o), expr.AsBool())

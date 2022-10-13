@@ -12,8 +12,9 @@ import (
 
 // Script is some executable string, along with data to supplement its
 // execution, such as template data and env vars. The string can contain go
-// template handles. These are to replace script aguments, as the use of
-// arguments can be compex on certain platfoms where the script may be executed.
+// template handles. These are to replace script arguments, as the use of
+// arguments can be complex on certain platforms where the script may be
+// executed.
 type Script struct {
 	raw  string
 	data map[string]any
@@ -76,7 +77,7 @@ func (s Script) Env() []string {
 	return s.env
 }
 
-// WithField adds a key/value to the map of template data to be used ehen
+// WithField adds a key/value to the map of template data to be used when
 // compiling the script. If the key already exists, it is overwritten.
 func (s Script) WithField(key string, value any) Script {
 	if s.data == nil {
