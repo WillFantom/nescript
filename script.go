@@ -87,6 +87,21 @@ func (s Script) WithField(key string, value any) Script {
 	return s
 }
 
+// WithFields takes a map of fields that is merged with the current script data.
+// If a key already exists in the script data, overwite must be set to true in
+// order to replace it, otherwise that key/value is left untouched.
+func (s Script) WithFields(fields map[string]any, overwrite bool) Script {
+	if s.data == nil {
+		s.data = make(map[string]any)
+	}
+	for k, v := range fields {
+		if _, ok := s.data[k]; !ok || overwrite {
+			s.data[k] = v
+		}
+	}
+	return s
+}
+
 // WithEnv takes one or more environmental variables in KEY=VALUE format. These
 // will be used when executing the script.
 func (s Script) WithEnv(env ...string) Script {
