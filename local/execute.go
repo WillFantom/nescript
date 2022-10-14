@@ -2,7 +2,6 @@ package local
 
 import (
 	"fmt"
-	"os/exec"
 
 	"github.com/willfantom/nescript"
 )
@@ -20,9 +19,12 @@ func Executor(workdir string, subcommand []string) nescript.ExecFunc {
 		subcommand = defaultSubcommand
 	}
 	return func(s nescript.Script) (nescript.Process, error) {
-		command := append(subcommand, s.Raw())
+		command, err := s.OSCmd(subcommand)
+		if err != nil {
+			return nil, err
+		}
 		process := LocalProcess{
-			cmd: exec.Command(command[0], command[1:]...),
+			cmd: command,
 		}
 		process.cmd.Env = s.Env()
 		process.cmd.Dir = workdir
