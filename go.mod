@@ -28,6 +28,6 @@ require (
 )
 
 require (
-	github.com/docker/docker v20.10.19+incompatible
+	github.com/docker/docker v20.10.20+incompatible
 	golang.org/x/sys v0.0.0-20221010170243-090e33056c14 // indirect
 )
