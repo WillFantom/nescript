@@ -6,27 +6,20 @@ import (
 	"github.com/willfantom/nescript"
 )
 
-var (
-	defaultSubcommand = []string{"sh", "-c"}
-)
-
-// Executor returns an exec func that can execute a NEScript locally. A
-// subcommand can be provided for the script (e.g. ["sh", "-c"]) or if nil, the
-// default will be used. Also a working directory can be set, that if left empty
-// will be set to the current working directory.
-func Executor(workdir string, subcommand []string) nescript.ExecFunc {
-	if subcommand == nil {
-		subcommand = defaultSubcommand
-	}
-	return func(s nescript.Script) (nescript.Process, error) {
-		command, err := s.OSCmd(subcommand)
+// Executor returns an exec func that can execute a NEScript locally. A working
+// directory can optionally be specified, where if not, the current working
+// directory of the application is used. This ExecFunc does not require that the
+// cmd/script be converted to a string, so is Formatter agnostic.
+func Executor(workdir string) nescript.ExecFunc {
+	return func(c nescript.Cmd) (nescript.Process, error) {
+		command, err := c.OSCmd()
 		if err != nil {
 			return nil, err
 		}
 		process := LocalProcess{
 			cmd: command,
 		}
-		process.cmd.Env = s.Env()
+		process.cmd.Env = c.Env()
 		process.cmd.Dir = workdir
 		process.cmd.Stdout = &process.stdoutBytes
 		process.cmd.Stderr = &process.stderrBytes

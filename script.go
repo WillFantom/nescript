@@ -16,17 +16,24 @@ import (
 // arguments can be complex on certain platforms where the script may be
 // executed.
 type Script struct {
-	raw  string
-	data map[string]any
-	env  []string
+	raw        string
+	subcommand Subcommand
+	*dynamicData
 }
+
+var (
+	defaultSubcommand Subcommand = SCShell
+)
 
 // NewScript creates a script based on the raw executable string.
 func NewScript(raw string) *Script {
 	script := Script{
-		raw:  raw,
-		data: make(map[string]any),
-		env:  make([]string, 0),
+		raw:        raw,
+		subcommand: defaultSubcommand,
+		dynamicData: &dynamicData{
+			data: make(map[string]any),
+			env:  make([]string, 0),
+		},
 	}
 	return &script
 }
@@ -66,24 +73,15 @@ func (s Script) Raw() string {
 	return s.raw
 }
 
-// Data returns the map of template data to be used when compiling the script.
-func (s Script) Data() map[string]any {
-	return s.data
-}
-
-// Env returns the env vars in KEY=VALUE format that will be used when executing
-// the script.
-func (s Script) Env() []string {
-	return s.env
+func (s Script) WithSubcommand(sc Subcommand) Script {
+	s.subcommand = sc
+	return s
 }
 
 // WithField adds a key/value to the map of template data to be used when
 // compiling the script. If the key already exists, it is overwritten.
 func (s Script) WithField(key string, value any) Script {
-	if s.data == nil {
-		s.data = make(map[string]any)
-	}
-	s.data[key] = value
+	s.addField(key, value)
 	return s
 }
 
@@ -91,31 +89,22 @@ func (s Script) WithField(key string, value any) Script {
 // If a key already exists in the script data, overwite must be set to true in
 // order to replace it, otherwise that key/value is left untouched.
 func (s Script) WithFields(fields map[string]any, overwrite bool) Script {
-	if s.data == nil {
-		s.data = make(map[string]any)
-	}
-	for k, v := range fields {
-		if _, ok := s.data[k]; !ok || overwrite {
-			s.data[k] = v
-		}
-	}
+	s.addFields(fields, overwrite)
 	return s
 }
 
 // WithEnv takes one or more environmental variables in KEY=VALUE format. These
 // will be used when executing the script.
 func (s Script) WithEnv(env ...string) Script {
-	if s.env == nil {
-		s.env = make([]string, 0)
-	}
-	s.env = append(s.env, env...)
+	s.addEnv(env...)
 	return s
 }
 
-// WithOSEnv appends the environmental variables from the local system to the
-// env var set currently held be the script.
-func (s Script) WithOSEnv() Script {
-	return s.WithEnv(os.Environ()...)
+// WithLocalOSEnv appends the environmental variables from the local system to
+// the env var set currently held be the script.
+func (s Script) WithLocalOSEnv() Script {
+	s.addLocalOSEnv()
+	return s
 }
 
 // Compile uses the go template engine and the provided data fields to compile
@@ -145,4 +134,24 @@ func (s Script) MustCompile() Script {
 		panic(err)
 	}
 	return compiledScript
+}
+
+// Cmd converts the script to a Cmd in the format [subcommand parts... , raw].
+// For example, the raw script "ping 8.8.8.8" with a subcommand ["sh", "-c"],
+// this would result in a Cmd equivalent to ["sh", "-c", "ping 8.8.8.8"]. This
+// does not compile the script first or the command after, thus handlebar values
+// will persist.
+func (s Script) Cmd() Cmd {
+	command := append(s.subcommand, s.raw)
+	var cmd *Cmd
+	if len(command) <= 0 {
+		cmd = NewCmd("")
+	} else if len(command) == 1 {
+		cmd = NewCmd(command[0])
+	} else {
+		cmd = NewCmd(command[0], command[1:]...)
+	}
+	cmd.dynamicData = s.dynamicData
+	cmd.formatter = defaultScriptFormatter
+	return *cmd
 }

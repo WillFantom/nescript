@@ -10,23 +10,23 @@ import (
 	"github.com/willfantom/nescript"
 )
 
-var (
-	defaultSubcommand = []string{"sh", "-c"}
-)
-
-func Executor(subcommand []string, client *docker.Client, workdir, containerID string) nescript.ExecFunc {
-	if subcommand == nil {
-		subcommand = defaultSubcommand
-	}
-	return func(s nescript.Script) (nescript.Process, error) {
+// Executor provides an ExecFunc that will start the script/cmd process in the
+// docker container with the given container ID. An initialized docker client
+// must also be passed for communication with the relevant docker engine.
+// Optionally, a WorkDir may be set, setting the precess working directory (path
+// should be in the context of the container's file system). This ExecFunc does
+// not require that the cmd/script be converted to a string, so is Formatter
+// agnostic.
+func Executor(client *docker.Client, containerID, workdir string) nescript.ExecFunc {
+	return func(c nescript.Cmd) (nescript.Process, error) {
 		config := types.ExecConfig{
 			Tty:          false,
 			AttachStdin:  true,
 			AttachStderr: true,
 			AttachStdout: true,
-			Env:          s.Env(),
+			Env:          c.Env(),
 			WorkingDir:   workdir,
-			Cmd:          append(subcommand, s.Raw()),
+			Cmd:          c.Raw(),
 		}
 		idResponse, err := client.ContainerExecCreate(context.Background(), containerID, config)
 		if err != nil {
